@@ -1,0 +1,387 @@
+%YAML 1.2
+---
+# https://docs.yoctoproject.org/bitbake/
+# https://www.sublimetext.com/docs/syntax.html
+name: BitBake
+scope: source.bitbake
+
+file_extensions:
+  - bb
+  - bbappend
+  - bbclass
+  - conf
+  - inc
+
+contexts:
+  main:
+    - include: comments
+    - include: directives
+    - include: python-function-definitions
+    - include: bitbake-function-definitions
+    - include: function-calls
+    - include: namespaces
+    - include: strings
+    - include: variable-assignments
+
+  expressions:
+    - include: function-calls
+    - include: strings
+    - include: namespaces
+    - include: variables
+
+### [ COMMENTS ] ##############################################################
+
+  comments:
+    - match: \#
+      scope: punctuation.definition.comment.bitbake
+      push: inside-comment
+
+  inside-comment:
+    - meta_scope: comment.line.bitbake
+    - match: $\n?
+      pop: true
+
+### [ DIRECTIVES ] ############################################################
+
+  directives:
+    - match: ^\s*(EXPORT_FUNCTIONS)\b
+      captures:
+        1: keyword.control.directive.bitbake
+      push: inside-export-directive
+    - match: ^\s*(addfragments|inherit|inherit_defer|include|include_all|require)\b
+      captures:
+        1: keyword.control.directive.bitbake
+      push: inside-import-directive
+    - match: ^\s*(addpylib)\b
+      captures:
+        1: keyword.control.directive.bitbake
+      push: inside-pylib-directive
+    - match: ^\s*(addhandler)\b
+      captures:
+        1: keyword.control.directive.bitbake
+      push: inside-handler-directive
+    - match: ^\s*(addtask|deltask)\b
+      captures:
+        1: keyword.control.directive.bitbake
+      push:
+        - inside-task-directive
+        - inside-task-directive-name
+    - match: ^\s*(unset)\b
+      captures:
+        1: keyword.control.directive.bitbake
+      push: inside-unset-directive
+
+  inside-export-directive:
+    - meta_scope: meta.directive.export.bitbake
+    - include: eol-pop
+    - match: '{{identifier}}'
+      scope: entity.name.function.bitbake
+
+  inside-handler-directive:
+    - meta_scope: meta.directive.handler.bitbake
+    - include: eol-pop
+    - include: expressions
+
+  inside-import-directive:
+    - meta_scope: meta.directive.import.bitbake
+    - include: eol-pop
+    - include: strings
+    - include: unquoted-strings
+
+  inside-pylib-directive:
+    - meta_scope: meta.directive.pylib.bitbake
+    - include: eol-pop
+    - include: expressions
+
+  inside-task-directive-name:
+    - match: '{{identifier}}'
+      scope: entity.name.task.bitbake
+      pop: true
+    - include: else-pop
+
+  inside-task-directive:
+    - meta_scope: meta.directive.task.bitbake
+    - include: eol-pop
+    - match: \b(before|after)\b
+      scope: keyword.control.directive.bitbake
+    - include: expressions
+
+  inside-unset-directive:
+    - meta_scope: meta.directive.unset.bitbake
+    - include: eol-pop
+    - include: expressions
+
+### [ BITBAKE FUNCTION DEFINITIONS ]###########################################
+
+  bitbake-function-definitions:
+    - match: ^(?:(fakeroot)\s+)?(python)\b
+      captures:
+        1: storage.modifier.bitbake
+        2: storage.type.bitbake
+      push: bitbake-python-function
+    - match: ^(({{identifier}})(?:(:)(append|prepend)?)?\s*)?(\()(\))(\s*)({)
+      captures:
+        1: meta.function.identifier.bitbake
+        2: entity.name.function.bitbake
+        3: punctuation.accessor.colon.bitbake
+        4: support.function.bitbake
+        5: meta.function.parameters.bitbake meta.group.bitbake punctuation.section.group.begin.bitbake
+        6: meta.function.parameters.bitbake meta.group.bitbake punctuation.section.group.end.bitbake
+        7: meta.function.bitbake.bitbake
+        8: meta.function.body.bitbake meta.block.bitbake punctuation.section.block.begin.bitbake
+      embed: scope:source.shell
+      embed_scope: meta.function.body.bitbake meta.block.bitbake source.shell.embedded.bitbake
+      escape: ^(\s*(\}))\s*$
+      escape_captures:
+        1: meta.function.body.bitbake meta.block.bitbake
+        2: punctuation.section.block.end.bitbake
+
+  bitbake-python-function:
+    - meta_scope: meta.function.bitbake
+    - match: (({{identifier}})(?:(:)(append|prepend)?)?\s*)?(\()(\))(\s*)({)
+      captures:
+        1: meta.function.identifier.bitbake
+        2: entity.name.function.bitbake
+        3: punctuation.accessor.colon.bitbake
+        4: support.function.bitbake
+        5: meta.function.parameters.bitbake meta.group.bitbake punctuation.section.group.begin.bitbake
+        6: meta.function.parameters.bitbake meta.group.bitbake punctuation.section.group.end.bitbake
+        7: meta.function.bitbake.bitbake
+        8: meta.function.body.bitbake meta.block.bitbake punctuation.section.block.begin.bitbake
+      embed: scope:source.python
+      embed_scope: meta.function.body.bitbake meta.block.bitbake source.python.embedded.bitbake
+      escape: ^(\s*(\}))\s*$
+      escape_captures:
+        1: meta.function.body.bitbake meta.block.bitbake
+        2: punctuation.section.block.end.bitbake
+      pop: true
+    - include: else-pop
+
+### [ PYTHON FUNCTION DEFINITIONS ]############################################
+
+  python-function-definitions:
+    # Note: Implement own simple python function signature implementation
+    # for backward compatibility with ST3
+    - match: ^def\b
+      scope: meta.function.python keyword.declaration.function.python
+      push:
+        - python-function-body
+        - python-function-name
+
+  python-function-name:
+    - meta_scope: meta.function.python
+    - match: \w+
+      scope: entity.name.function.python
+      set: python-function-parameter-list
+    - include: python-function-parameter-list
+
+  python-function-parameter-list:
+    - meta_include_prototype: false
+    - meta_content_scope: meta.function.python
+    - match: \(
+      scope: meta.function.parameters.python punctuation.section.parameters.begin.python
+      set: python-function-parameter-list-body
+    - include: python-function-signature-end
+
+  python-function-parameter-list-body:
+    - meta_content_scope: meta.function.parameters.python
+    - match: \)
+      scope: meta.function.parameters.python punctuation.section.parameters.end.python
+      set: python-function-signature-end
+    - match: ','
+      scope: punctuation.separator.comma.python
+    - match: '{{identifier}}'
+      scope: variable.parameter.python
+
+  python-function-signature-end:
+    - meta_content_scope: meta.function.python
+    - match: ':'
+      scope: meta.function.python punctuation.section.block.begin.python
+      pop: true
+    - include: eol-pop
+
+  python-function-body:
+    - meta_include_prototype: false
+    - meta_scope: source.python.embedded.bitbake
+    - match: ^
+      pop: true
+    - match: ''
+      embed: scope:source.python
+      embed_scope: source.python.embedded.bitbake meta.function.body.python meta.block.python
+      escape: ^(?=\S)
+
+### [ VARIABLE DEFINITIONS ]###################################################
+
+  variable-assignments:
+    - match: ^\s*(?:(export)\s+)?({{identifier}})
+      captures:
+        1: storage.modifier.bitbake
+        2: variable.other.bitbake
+      push:
+        - variable-assignment-value
+        - variable-assignment-operator
+        - variable-assignment-condition
+
+  variable-assignment-condition:
+    - match: \[
+      scope: punctuation.section.brackets.begin.bitbake
+      set: inside-dependency-list
+    - match: (:)(append|prepend)\b
+      captures:
+        1: punctuation.accessor.colon.bitbake
+        2: support.function.bitbake
+    - match: (:)({{identifier}})
+      captures:
+        1: punctuation.accessor.colon.bitbake
+        2: storage.modifier.bitbake
+    - match: ''
+      pop: true
+
+  inside-dependency-list:
+    - meta_scope: meta.flags.bitbake meta.brackets.bitbake
+    - match: \]
+      scope: punctuation.section.brackets.end.bitbake
+      pop: true
+    - match: '{{flags}}'
+      scope: constant.language.flag.bitbake
+    - match: '{{identifier}}'
+      scope: constant.other.bitbake
+
+  variable-assignment-operator:
+    - match: '{{assignment_operators}}'
+      scope: keyword.operator.assignment.bitbake
+      pop: true
+    - include: else-pop
+    - include: eol-pop
+
+  variable-assignment-value:
+    - meta_scope: meta.binding.bitbake
+    - include: eol-pop
+    - include: expressions
+
+### [ EXPRESSIONS ] ###########################################################
+
+  function-calls:
+    - match: ({{identifier}})(\()
+      captures:
+        1: meta.function-call.identifier.bitbake variable.function.bitbake
+        2: meta.function-call.arguments.bitbake meta.group.bitbake punctuation.section.group.begin.bitbake
+      push: inside-function-call-argument-list
+
+  inside-function-call-argument-list:
+    - meta_content_scope: meta.function-call.arguments.bitbake meta.group.bitbake
+    - match: \)
+      scope: meta.function-call.arguments.bitbake meta.group.bitbake punctuation.section.group.end.bitbake
+      pop: true
+    - match: ','
+      scope: punctuation.separator.comma.python
+    - include: expressions
+
+  strings:
+    - match: \"
+      scope: punctuation.definition.string.begin.bitbake
+      push: inside-double-quoted-string
+    - match: \'
+      scope: punctuation.definition.string.begin.bitbake
+      push: inside-single-quoted-string
+
+  inside-double-quoted-string:
+    - meta_scope: meta.string.bitbake string.quoted.double.bitbake
+    - match: \"
+      scope: punctuation.definition.string.end.bitbake
+      pop: true
+    - include: string-content
+
+  inside-single-quoted-string:
+    - meta_scope: meta.string.bitbake string.quoted.single.bitbake
+    - match: \'
+      scope: punctuation.definition.string.end.bitbake
+      pop: true
+    - include: string-content
+
+  unquoted-strings:
+    - match: (?=\S)
+      push: inside-unquoted-string
+
+  inside-unquoted-string:
+    - meta_scope: meta.string.bitbake string.unquoted.bitbake
+    - match: (?=\s)
+      pop: true
+    - include: string-content
+
+  string-content:
+    - match: \\$
+      scope: punctuation.separator.continuation.line.bitbake
+    - match: \\.
+      scope: constant.character.escape.bitbake
+    - match: (\$)(\{)
+      captures:
+        1: punctuation.definition.interpolation.begin.bitbake
+        2: punctuation.section.interpolation.begin.bitbake
+      push: inside-interpolation
+
+  inside-interpolation:
+    - clear_scopes: 1
+    - meta_scope: meta.interpolation.bitbake
+    - match: \}
+      scope: punctuation.section.interpolation.end.bitbake
+      pop: true
+    - match: \@
+      scope: punctuation.definition.expansion.bitbake
+      embed: scope:source.python
+      escape: (?=\})
+    - include: expressions
+
+  namespaces:
+    - match: ({{identifier}})\s*(\.)
+      captures:
+        1: variable.namespace.bitbake
+        2: punctuation.accessor.dot.bitbake
+
+  variables:
+    - match: '{{identifier}}'
+      scope: variable.other.bitbake
+      push: variable-assignment-condition
+
+### [ PROTOTYPES ] ############################################################
+
+  else-pop:
+    - match: (?=\S)
+      pop: true
+
+  eol-pop:
+    - match: (?=\s*[#\n])
+      pop: true
+
+###############################################################################
+
+variables:
+  assignment_operators: (\?\?\=|\?\=|\:\=|\+\=|\=\+|\.\=|\=\.|\=)
+
+  identifier: '[[:alpha:]][[:alnum:]_-]*\b'
+
+  flags: |-
+    (?x:
+      cleandirs
+    | depends
+    | deptask
+    | dirs
+    | file-checksums
+    | lockfiles
+    | network
+    | noexec
+    | nostamp
+    | number_threads
+    | postfuncs
+    | prefuncs
+    | rdepends
+    | rdeptask
+    | recideptask
+    | recrdeptask
+    | stamp-extra-info
+    | umask
+    | vardeps
+    | vardepsexclude
+    | vardepvalue
+    | vardepvalueexclude
+    )\b

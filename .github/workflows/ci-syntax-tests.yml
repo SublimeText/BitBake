@@ -1,0 +1,52 @@
+name: CI Syntax Tests
+
+on:
+  push:
+    branches:
+      - 'master'
+    tags-ignore:
+      - '**'
+    paths:
+      - '.github/workflows/ci-syntax-tests.yml'
+      - '**.sublime-syntax'
+      - '**/syntax_test_*'
+      - '**.tmPreferences'
+  pull_request:
+    paths:
+      - '.github/workflows/ci-syntax-tests.yml'
+      - '**.sublime-syntax'
+      - '**/syntax_test_*'
+      - '**.tmPreferences'
+  workflow_dispatch:
+
+jobs:
+  syntax_tests:
+    name: Sublime Text ${{ matrix.build }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # default is 6 hours!
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # first supported ST build (no longer working)
+          # - build: 3176
+          #   default_packages: v3176
+          # Stable ST4 builds
+          - build: 4107
+            default_packages: v4107
+          - build: 4200
+            default_packages: v4200
+          # Latest dev build
+          - build: latest
+            default_packages: master
+    steps:
+      - name: Checkout BitBake
+        uses: actions/checkout@v7
+        with:
+          path: BitBake
+      - uses: SublimeText/syntax-test-action@v2
+        with:
+          build: ${{ matrix.build }}
+          package_name: BitBake
+          package_root: BitBake
+          default_packages: ${{ matrix.default_packages }}
